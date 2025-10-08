@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,59 +15,26 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, Plus, BookOpen, MessageCircle, Calendar, Search, Crown } from "lucide-react";
+import { Users, Plus, BookOpen, MessageCircle, Calendar, Search, Crown, Loader2 } from "lucide-react";
 
-// Mock data - em produção, buscar do banco de dados
-const mockClubs = [
-  {
-    id: "1",
-    name: "Leitores de Fantasia",
-    description: "Para amantes de mundos mágicos e aventuras épicas",
-    memberCount: 247,
-    currentBook: "O Nome do Vento",
-    bookCover: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400",
-    nextMeeting: "2024-02-15",
-    vibeTags: ["atmospheric", "adventurous"],
-    isPrivate: false,
-    isMember: true,
-  },
-  {
-    id: "2",
-    name: "Clássicos Modernos",
-    description: "Explorando a literatura contemporânea que se tornou atemporal",
-    memberCount: 189,
-    currentBook: "1984",
-    bookCover: "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400",
-    nextMeeting: "2024-02-20",
-    vibeTags: ["thought-provoking", "dark"],
-    isPrivate: false,
-    isMember: false,
-  },
-  {
-    id: "3",
-    name: "Histórias Emocionantes",
-    description: "Livros que tocam o coração e transformam perspectivas",
-    memberCount: 312,
-    currentBook: "A Menina que Roubava Livros",
-    bookCover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400",
-    nextMeeting: "2024-02-18",
-    vibeTags: ["emotional", "uplifting"],
-    isPrivate: false,
-    isMember: true,
-  },
-  {
-    id: "4",
-    name: "Mistérios e Suspense",
-    description: "Para quem ama uma boa trama de mistério",
-    memberCount: 156,
-    currentBook: "O Oceano no Fim do Caminho",
-    bookCover: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400",
-    nextMeeting: "2024-02-22",
-    vibeTags: ["mysterious", "magical"],
-    isPrivate: true,
-    isMember: false,
-  },
-];
+interface Club {
+  id: string;
+  name: string;
+  description: string;
+  vibe: string;
+  coverImage: string | null;
+  isPublic: boolean;
+  membersCount: number;
+  currentBook?: {
+    book: {
+      id: string;
+      title: string;
+      author: string;
+      cover: string | null;
+    };
+  };
+  isMember: boolean;
+}
 
 export default function ClubsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,23 +42,58 @@ export default function ClubsPage() {
   const [newClub, setNewClub] = useState({
     name: "",
     description: "",
-    isPrivate: false,
+    vibe: "",
+    isPublic: true,
   });
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredClubs = mockClubs.filter(
-    (club) =>
-      club.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      club.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Carregar clubes
+  useEffect(() => {
+    loadClubs();
+  }, [searchQuery]);
 
-  const myClubs = filteredClubs.filter((club) => club.isMember);
-  const suggestedClubs = filteredClubs.filter((club) => !club.isMember);
+  const loadClubs = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (searchQuery) params.set('search', searchQuery);
+      
+      const response = await fetch(`/api/clubs?${params}`);
+      if (!response.ok) throw new Error('Erro ao carregar clubes');
+      
+      const data = await response.json();
+      setClubs(data.clubs);
+    } catch (error) {
+      console.error('Error loading clubs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleCreateClub = () => {
-    // Em produção, enviar para API
-    console.log("Criar clube:", newClub);
-    setIsCreateDialogOpen(false);
-    setNewClub({ name: "", description: "", isPrivate: false });
+  const myClubs = clubs.filter((club) => club.isMember);
+  const suggestedClubs = clubs.filter((club) => !club.isMember);
+
+  const handleCreateClub = async () => {
+    try {
+      const response = await fetch('/api/clubs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newClub),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao criar clube');
+      }
+
+      alert('Clube criado com sucesso!');
+      setIsCreateDialogOpen(false);
+      setNewClub({ name: "", description: "", vibe: "", isPublic: true });
+      loadClubs(); // Recarregar lista
+    } catch (error: any) {
+      alert(error.message);
+    }
   };
 
   return (
@@ -105,13 +107,14 @@ export default function ClubsPage() {
           </p>
         </div>
 
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Criar Clube
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Criar Clube
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Criar Novo Clube</DialogTitle>
@@ -143,18 +146,29 @@ export default function ClubsPage() {
                   rows={3}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="club-vibe">Vibe do Clube</Label>
+                <Input
+                  id="club-vibe"
+                  placeholder="Ex: cozy, dark, uplifting"
+                  value={newClub.vibe}
+                  onChange={(e) =>
+                    setNewClub({ ...newClub, vibe: e.target.value })
+                  }
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  id="club-private"
-                  checked={newClub.isPrivate}
+                  id="club-public"
+                  checked={newClub.isPublic}
                   onChange={(e) =>
-                    setNewClub({ ...newClub, isPrivate: e.target.checked })
+                    setNewClub({ ...newClub, isPublic: e.target.checked })
                   }
                   className="rounded"
                 />
-                <Label htmlFor="club-private" className="cursor-pointer">
-                  Clube privado (apenas por convite)
+                <Label htmlFor="club-public" className="cursor-pointer">
+                  Clube público (qualquer um pode entrar)
                 </Label>
               </div>
             </div>
@@ -173,7 +187,8 @@ export default function ClubsPage() {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </header>
 
       {/* Search */}
@@ -187,86 +202,117 @@ export default function ClubsPage() {
         />
       </div>
 
-      {/* My Clubs */}
-      {myClubs.length > 0 && (
-        <section className="mb-12">
-          <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-            <Crown className="h-6 w-6 text-primary" />
-            Meus Clubes
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {myClubs.map((club) => (
-              <ClubCard key={club.id} club={club} />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Loading State */}
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <>
+          {/* My Clubs */}
+          {myClubs.length > 0 && (
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                <Crown className="h-6 w-6 text-primary" />
+                Meus Clubes
+              </h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {myClubs.map((club) => (
+                  <ClubCard key={club.id} club={club} onUpdate={loadClubs} />
+                ))}
+              </div>
+            </section>
+          )}
 
-      {/* Suggested Clubs */}
-      <section>
-        <h2 className="text-2xl font-bold mb-4">
-          {myClubs.length > 0 ? "Descobrir Mais Clubes" : "Clubes Disponíveis"}
-        </h2>
-        {suggestedClubs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Users className="h-20 w-20 text-muted-foreground mb-4 opacity-20" />
-            <h3 className="text-xl font-semibold mb-2">Nenhum clube encontrado</h3>
-            <p className="text-muted-foreground mb-4">
-              Tente buscar por outro nome ou crie seu próprio clube
-            </p>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Criar Primeiro Clube
-            </Button>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {suggestedClubs.map((club) => (
-              <ClubCard key={club.id} club={club} />
-            ))}
-          </div>
-        )}
-      </section>
+          {/* Suggested Clubs */}
+          <section>
+            <h2 className="text-2xl font-bold mb-4">
+              {myClubs.length > 0 ? "Descobrir Mais Clubes" : "Clubes Disponíveis"}
+            </h2>
+            {suggestedClubs.length === 0 && !loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <Users className="h-20 w-20 text-muted-foreground mb-4 opacity-20" />
+                <h3 className="text-xl font-semibold mb-2">Nenhum clube encontrado</h3>
+                <p className="text-muted-foreground mb-4">
+                  Tente buscar por outro nome ou crie seu próprio clube
+                </p>
+                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Criar Primeiro Clube
+                </Button>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {suggestedClubs.map((club) => (
+                  <ClubCard key={club.id} club={club} onUpdate={loadClubs} />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }
 
-function ClubCard({ club }: { club: (typeof mockClubs)[0] }) {
+function ClubCard({ club, onUpdate }: { club: Club; onUpdate: () => void }) {
   const [isJoined, setIsJoined] = useState(club.isMember);
+  const [loading, setLoading] = useState(false);
 
-  const handleJoinToggle = () => {
-    // Em produção, enviar para API
-    setIsJoined(!isJoined);
+  const handleJoinToggle = async () => {
+    try {
+      setLoading(true);
+      const endpoint = isJoined 
+        ? `/api/clubs/${club.id}/leave`
+        : `/api/clubs/${club.id}/join`;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao processar solicitação');
+      }
+
+      setIsJoined(!isJoined);
+      onUpdate(); // Recarregar lista para atualizar contadores
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const meetingDate = new Date(club.nextMeeting);
-  const formattedDate = meetingDate.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-  });
+  const currentBookTitle = club.currentBook?.book.title || "Nenhum livro selecionado";
+  const bookCover = club.currentBook?.book.cover || club.coverImage;
 
   return (
     <Card className="group hover:shadow-xl transition-all overflow-hidden">
       <div className="relative">
         {/* Current Book Cover */}
         <div className="aspect-video relative overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
-          <img
-            src={club.bookCover}
-            alt={club.currentBook}
-            className="w-full h-full object-cover opacity-40 group-hover:opacity-60 transition-opacity"
-          />
+          {bookCover ? (
+            <img
+              src={bookCover}
+              alt={currentBookTitle}
+              className="w-full h-full object-cover opacity-40 group-hover:opacity-60 transition-opacity"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/30 to-secondary/30" />
+          )}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
               <BookOpen className="h-12 w-12 text-white mx-auto mb-2" />
               <p className="text-white font-semibold text-sm px-4">
-                Lendo: {club.currentBook}
+                {currentBookTitle}
               </p>
             </div>
           </div>
         </div>
 
         {/* Private Badge */}
-        {club.isPrivate && (
+        {!club.isPublic && (
           <Badge
             variant="secondary"
             className="absolute top-2 right-2 bg-black/50 text-white border-none"
@@ -287,24 +333,20 @@ function ClubCard({ club }: { club: (typeof mockClubs)[0] }) {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Vibe Tags */}
-        <div className="flex flex-wrap gap-2">
-          {club.vibeTags.map((tag) => (
-            <Badge key={tag} variant="outline" className="text-xs">
-              {tag}
+        {/* Vibe Tag */}
+        {club.vibe && (
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className="text-xs">
+              {club.vibe}
             </Badge>
-          ))}
-        </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             <Users className="h-4 w-4" />
-            <span>{club.memberCount} membros</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            <span>{formattedDate}</span>
+            <span>{club.membersCount} membros</span>
           </div>
         </div>
 
@@ -314,23 +356,29 @@ function ClubCard({ club }: { club: (typeof mockClubs)[0] }) {
             <>
               <Button className="flex-1 gap-2" variant="default">
                 <MessageCircle className="h-4 w-4" />
-                Chat
+                Ver Clube
               </Button>
               <Button
                 variant="outline"
                 onClick={handleJoinToggle}
+                disabled={loading}
                 className="hover:bg-destructive hover:text-destructive-foreground"
               >
-                Sair
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sair"}
               </Button>
             </>
           ) : (
             <Button
               className="w-full"
-              variant={club.isPrivate ? "outline" : "default"}
+              variant={!club.isPublic ? "outline" : "default"}
               onClick={handleJoinToggle}
+              disabled={loading}
             >
-              {club.isPrivate ? "Solicitar Convite" : "Entrar no Clube"}
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                !club.isPublic ? "Solicitar Convite" : "Entrar no Clube"
+              )}
             </Button>
           )}
         </div>

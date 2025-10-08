@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Sparkles, Compass, Library, Users, User, Menu } from "lucide-react";
+import { Sparkles, Compass, Library, Users, User, Menu, MessageCircle, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navigation = [
+  { name: "Feed", href: "/feed", icon: Home },
   { name: "Descobrir", href: "/discover", icon: Compass },
   { name: "Biblioteca", href: "/library", icon: Library },
+  { name: "Chat", href: "/chat", icon: MessageCircle },
   { name: "Clubes", href: "/clubs", icon: Users },
   { name: "Perfil", href: "/profile", icon: User },
 ];
@@ -25,8 +28,14 @@ export default function DashboardLayout({
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-primary" />
+          <Link href="/feed" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Image 
+              src="/lumina.png" 
+              alt="Lúmina" 
+              width={32} 
+              height={32} 
+              className="h-8 w-8 object-contain"
+            />
             <span className="text-2xl font-bold text-gradient">Lúmina</span>
           </Link>
 
@@ -68,7 +77,7 @@ export default function DashboardLayout({
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-background/95 backdrop-blur">
-        <div className="grid grid-cols-4 gap-1 p-2">
+        <div className="grid grid-cols-6 gap-1 p-2">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -78,14 +87,14 @@ export default function DashboardLayout({
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-lg py-2 px-3 transition-colors",
+                  "flex flex-col items-center gap-1 rounded-lg py-2 px-1 transition-colors",
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-muted"
                 )}
               >
                 <Icon className="h-5 w-5" />
-                <span className="text-xs font-medium">{item.name}</span>
+                <span className="text-[10px] font-medium">{item.name}</span>
               </Link>
             );
           })}

@@ -45,6 +45,7 @@ model User {
   image         String?
   avatar        String?
   password      String?
+  bio           String?   @db.Text
   
   // Reset de senha
   resetToken         String?   @unique
@@ -71,6 +72,19 @@ model User {
   readingHistory    ReadingHistory[]
   bookCollections   BookCollection[]
   auditLogs         AuditLog[]
+  
+  // Social
+  posts             Post[]
+  likes             Like[]
+  comments          Comment[]
+  following         Follow[]         @relation("UserFollows")
+  followers         Follow[]         @relation("UserFollowers")
+  
+  // Clubes
+  clubDiscussions   ClubDiscussion[]
+  discussionLikes   ClubDiscussionLike[]
+  invitesSent       ClubInvite[]     @relation("InvitesSent")
+  invitesReceived   ClubInvite[]     @relation("InvitesReceived")
 }
 
 model VerificationToken {
@@ -152,6 +166,8 @@ model Club {
   // Relações
   members       ClubMember[]
   books         ClubBook[]
+  discussions   ClubDiscussion[]
+  invites       ClubInvite[]
   currentBookId String?
   
   createdAt     DateTime   @default(now())
@@ -181,8 +197,53 @@ model ClubBook {
   startDate DateTime @default(now())
   endDate   DateTime?
   isCurrent Boolean  @default(false)
+  votes     Int      @default(0) // Votos para se tornar o próximo livro
   
   @@unique([clubId, bookId])
+}
+
+model ClubDiscussion {
+  id        String   @id @default(cuid())
+  clubId    String
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  parentId  String?  // Para replies
+  parent    ClubDiscussion? @relation("DiscussionReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   ClubDiscussion[] @relation("DiscussionReplies")
+  likes     ClubDiscussionLike[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ClubDiscussionLike {
+  id           String   @id @default(cuid())
+  discussionId String
+  discussion   ClubDiscussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime @default(now())
+  
+  @@unique([discussionId, userId])
+}
+
+model ClubInvite {
+  id          String   @id @default(cuid())
+  clubId      String
+  club        Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  invitedBy   String   // userId de quem convidou
+  inviter     User     @relation("InvitesSent", fields: [invitedBy], references: [id], onDelete: Cascade)
+  invitedUser String   // userId de quem foi convidado
+  invited     User     @relation("InvitesReceived", fields: [invitedUser], references: [id], onDelete: Cascade)
+  status      String   @default("pending") // "pending", "accepted", "rejected"
+  
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  
+  @@unique([clubId, invitedUser])
 }
 
 model Achievement {
@@ -267,5 +328,76 @@ model AuditLog {
   
   @@index([userId])
   @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================
+// SOCIAL MODELS
+// ============================================
+
+model Post {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  content     String   @db.Text
+  bookTitle   String?  // Título do livro relacionado (opcional)
+  bookAuthor  String?  // Autor do livro relacionado (opcional)
+  bookCover   String?  // Capa do livro relacionado (opcional)
+  bookId      String?  // ID do livro no Google Books (opcional)
+  
+  likes       Like[]
+  comments    Comment[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String   // Quem está seguindo
+  followingId String   // Quem está sendo seguido
+  
+  follower    User     @relation("UserFollows", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, postId])
+  @@index([postId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  content   String   @db.Text
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([postId])
+  @@index([userId])
   @@index([createdAt])
 }

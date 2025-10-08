@@ -4,15 +4,16 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, X, Star, BookOpen } from "lucide-react";
+import { Heart, X, Star, BookOpen, Info } from "lucide-react";
 import type { Book } from "@/types";
 
 interface BookSwiperProps {
   books: Book[];
   onSwipe: (bookId: string, action: "like" | "dislike" | "super_like") => void;
+  onBookClick?: (book: Book) => void;
 }
 
-export function BookSwiper({ books, onSwipe }: BookSwiperProps) {
+export function BookSwiper({ books, onSwipe, onBookClick }: BookSwiperProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<"left" | "right" | null>(null);
 
@@ -92,6 +93,18 @@ export function BookSwiper({ books, onSwipe }: BookSwiperProps) {
                   <span>•</span>
                   <span>{currentBook.pace === "fast" ? "Rápido" : currentBook.pace === "slow" ? "Lento" : "Moderado"}</span>
                 </div>
+
+                {/* Botão Ver Detalhes */}
+                {onBookClick && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => onBookClick(currentBook)}
+                  >
+                    <Info className="h-4 w-4 mr-2" />
+                    Ver Detalhes e Comprar
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </motion.div>

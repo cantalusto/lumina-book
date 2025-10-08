@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Lúmina - Descoberta Literária Inteligente",
@@ -15,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark">
       <body className="antialiased min-h-screen bg-background">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

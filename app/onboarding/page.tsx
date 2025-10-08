@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Sparkles, ArrowRight, ArrowLeft } from "lucide-react";
+import { Sparkles, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 
 const GENRES = [
   "Fantasia", "Ficção Científica", "Romance", "Mistério", "Thriller",
@@ -33,12 +34,55 @@ const VIBES = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [step, setStep] = useState(1);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
   const [selectedVibes, setSelectedVibes] = useState<string[]>([]);
   const [readingPace, setReadingPace] = useState("medium");
   const [preferredLength, setPreferredLength] = useState("medium");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(true);
+  const [isReconfiguring, setIsReconfiguring] = useState(false);
+  const [error, setError] = useState("");
+
+  // Verificar se usuário já tem perfil ao carregar a página
+  useEffect(() => {
+    checkExistingProfile();
+  }, []);
+
+  const checkExistingProfile = async () => {
+    try {
+      const response = await fetch("/api/profile");
+      const data = await response.json();
+
+      if (response.ok && data.profile) {
+        // Usuário já tem perfil
+        // Verificar se está vindo da página de descobrir (reconfigurando)
+        const urlParams = new URLSearchParams(window.location.search);
+        const reconfigure = urlParams.get("reconfigure");
+
+        if (reconfigure === "true") {
+          // Modo reconfiguração - carregar dados existentes
+          setIsReconfiguring(true);
+          setSelectedGenres(data.profile.favoriteGenres || []);
+          setSelectedMoods(data.profile.moodTags || []);
+          setReadingPace(data.profile.readingPace || "medium");
+          setPreferredLength(data.profile.preferredLength || "medium");
+          setIsCheckingProfile(false);
+        } else {
+          // Já tem perfil e não está reconfigurando - redirecionar para descobrir
+          router.push("/discover");
+        }
+      } else {
+        // Não tem perfil - mostrar onboarding
+        setIsCheckingProfile(false);
+      }
+    } catch (error) {
+      console.error("Erro ao verificar perfil:", error);
+      setIsCheckingProfile(false);
+    }
+  };
 
   const toggleSelection = (item: string, list: string[], setList: (list: string[]) => void) => {
     if (list.includes(item)) {
@@ -63,25 +107,48 @@ export default function OnboardingPage() {
   };
 
   const handleFinish = async () => {
-    // Salvar perfil no banco de dados
-    const profileData = {
-      favoriteGenres: selectedGenres,
-      moodTags: selectedMoods,
-      vibePreferences: {
-        atmospheric: selectedVibes.includes("atmospheric") ? 8 : 5,
-        plotDriven: selectedVibes.includes("fast-paced") ? 8 : 5,
-        characterDriven: selectedVibes.includes("emotional") ? 8 : 5,
-        philosophical: selectedVibes.includes("thought-provoking") ? 8 : 5,
-        actionPacked: selectedVibes.includes("fast-paced") ? 8 : 5,
-      },
-      readingPace,
-      preferredLength,
-    };
+    setIsLoading(true);
+    setError("");
 
-    console.log("Profile data:", profileData);
+    try {
+      // Salvar perfil no banco de dados
+      const profileData = {
+        favoriteGenres: selectedGenres,
+        moodTags: selectedMoods,
+        vibePreferences: {
+          atmospheric: selectedVibes.includes("atmospheric") ? 8 : 5,
+          plotDriven: selectedVibes.includes("fast-paced") ? 8 : 5,
+          characterDriven: selectedVibes.includes("emotional") ? 8 : 5,
+          philosophical: selectedVibes.includes("thought-provoking") ? 8 : 5,
+          actionPacked: selectedVibes.includes("fast-paced") ? 8 : 5,
+        },
+        readingPace,
+        preferredLength,
+      };
 
-    // Redirecionar para a página de descoberta
-    router.push("/discover");
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao salvar perfil");
+      }
+
+      console.log("Perfil salvo com sucesso:", data);
+
+      // Redirecionar para a página de descoberta
+      router.push("/discover");
+    } catch (err: any) {
+      console.error("Erro ao salvar perfil:", err);
+      setError(err.message || "Erro ao salvar preferências. Tente novamente.");
+      setIsLoading(false);
+    }
   };
 
   const isStepValid = () => {
@@ -99,6 +166,18 @@ export default function OnboardingPage() {
     }
   };
 
+  // Mostrar loading enquanto verifica perfil
+  if (isCheckingProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
@@ -109,6 +188,17 @@ export default function OnboardingPage() {
 
         <Card>
           <CardContent className="p-8">
+            {/* Mensagem de reconfiguração */}
+            {isReconfiguring && (
+              <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                <p className="text-sm text-primary font-medium">
+                  ✨ Reconfigurando suas preferências
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Suas configurações atuais estão pré-selecionadas. Faça as alterações desejadas.
+                </p>
+              </div>
+            )}
             {/* Progress indicator */}
             <div className="mb-8">
               <div className="flex justify-between mb-2">
@@ -255,12 +345,19 @@ export default function OnboardingPage() {
               </div>
             )}
 
+            {/* Error Message */}
+            {error && (
+              <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive text-center">{error}</p>
+              </div>
+            )}
+
             {/* Navigation */}
             <div className="flex justify-between mt-8">
               <Button
                 onClick={handleBack}
                 variant="outline"
-                disabled={step === 1}
+                disabled={step === 1 || isLoading}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Voltar
@@ -268,9 +365,14 @@ export default function OnboardingPage() {
               <Button
                 onClick={handleNext}
                 variant="glow"
-                disabled={!isStepValid()}
+                disabled={!isStepValid() || isLoading}
               >
-                {step === 4 ? (
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : step === 4 ? (
                   <>
                     Finalizar
                     <Sparkles className="ml-2 h-4 w-4" />
