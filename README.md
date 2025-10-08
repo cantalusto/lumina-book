@@ -232,7 +232,7 @@ MIT License - veja [LICENSE](LICENSE) para detalhes.
 ## 👥 Autor
 
 **Lucas**
-- GitHub: [@seu-usuario](https://github.com/seu-usuario)
+- GitHub: [@seu-usuario](https://github.com/cantalusto)
 
 ---
 
