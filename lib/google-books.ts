@@ -192,10 +192,71 @@ export async function getRecommendedBooksByGenres(
 }
 
 /**
+ * Melhorar qualidade da imagem de capa do Google Books
+ * O Google Books API retorna thumbnails pequenas por padrão,
+ * mas podemos manipular a URL para obter versões maiores
+ */
+export function getHighQualityBookCover(imageUrl?: string): string {
+  if (!imageUrl) {
+    return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&h=1200&fit=crop";
+  }
+
+  // Substituir HTTP por HTTPS
+  let url = imageUrl.replace("http://", "https://");
+
+  // Substituir zoom=1 por zoom=2 ou zoom=3 para maior qualidade
+  url = url.replace("zoom=1", "zoom=3");
+  
+  // Remover edge=curl (efeito de página virada) para imagem mais limpa
+  url = url.replace("&edge=curl", "");
+  
+  // Aumentar o tamanho se houver parâmetros de dimensão
+  url = url.replace(/&w=\d+/, "&w=800");
+  url = url.replace(/&h=\d+/, "&h=1200");
+
+  return url;
+}
+
+/**
+ * Obter imagem de fallback baseada no gênero do livro
+ */
+export function getGenreFallbackImage(genres?: string[]): string {
+  const genre = genres?.[0]?.toLowerCase() || "general";
+  
+  const genreImages: Record<string, string> = {
+    "fiction": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&h=1200&fit=crop",
+    "romance": "https://images.unsplash.com/photo-1474552226712-ac0f0961a954?w=800&h=1200&fit=crop",
+    "mystery": "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=1200&fit=crop",
+    "science fiction": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&h=1200&fit=crop",
+    "fantasy": "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=800&h=1200&fit=crop",
+    "thriller": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=1200&fit=crop",
+    "horror": "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=800&h=1200&fit=crop",
+    "biography": "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800&h=1200&fit=crop",
+    "history": "https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=800&h=1200&fit=crop",
+    "self-help": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&h=1200&fit=crop",
+    "business": "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&h=1200&fit=crop",
+  };
+
+  // Buscar por gênero específico
+  for (const [key, value] of Object.entries(genreImages)) {
+    if (genre.includes(key)) {
+      return value;
+    }
+  }
+
+  // Fallback geral
+  return "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&h=1200&fit=crop";
+}
+
+/**
  * Converter GoogleBook para formato do Lúmina
  */
 export function convertGoogleBookToLuminaFormat(googleBook: GoogleBook) {
   const { volumeInfo } = googleBook;
+
+  // Obter imagem em alta qualidade
+  const highQualityThumbnail = getHighQualityBookCover(volumeInfo.imageLinks?.thumbnail);
+  const fallbackImage = getGenreFallbackImage(volumeInfo.categories);
 
   return {
     id: googleBook.id,
@@ -204,8 +265,7 @@ export function convertGoogleBookToLuminaFormat(googleBook: GoogleBook) {
       authors: volumeInfo.authors || ["Autor Desconhecido"],
       description: volumeInfo.description || "Descrição não disponível",
       imageLinks: {
-        thumbnail: volumeInfo.imageLinks?.thumbnail?.replace("http://", "https://") ||
-          "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400",
+        thumbnail: volumeInfo.imageLinks?.thumbnail ? highQualityThumbnail : fallbackImage,
         smallThumbnail: volumeInfo.imageLinks?.smallThumbnail?.replace("http://", "https://"),
       },
       categories: volumeInfo.categories || [],

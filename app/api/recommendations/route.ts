@@ -73,11 +73,57 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Buscar por gêneros favoritos (método mais rápido e confiável)
-    const genres = profile.favoriteGenres || [];
+    // Buscar histórico de swipes do usuário para melhorar recomendações
+    const likedSwipes = await prisma.swipe.findMany({
+      where: {
+        userId: user.id,
+        action: { in: ["like", "super_like"] },
+      },
+      include: {
+        book: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 20, // Últimos 20 livros curtidos
+    });
+
+    // Extrair gêneros dos livros curtidos
+    const likedGenres: string[] = [];
+    const likedAuthors: string[] = [];
+    
+    likedSwipes.forEach(swipe => {
+      if (swipe.book.genres && swipe.book.genres.length > 0) {
+        likedGenres.push(...swipe.book.genres);
+      }
+      if (swipe.book.author) {
+        likedAuthors.push(swipe.book.author);
+      }
+    });
+
+    // Contar frequência de gêneros
+    const genreCount: Record<string, number> = {};
+    likedGenres.forEach(genre => {
+      genreCount[genre] = (genreCount[genre] || 0) + 1;
+    });
+
+    // Pegar top 3 gêneros mais curtidos
+    const topLikedGenres = Object.entries(genreCount)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([genre]) => genre);
+
+    // Combinar gêneros do perfil com gêneros curtidos (dar prioridade aos curtidos)
+    const genres = [
+      ...topLikedGenres,
+      ...(profile.favoriteGenres || []),
+    ].slice(0, 5); // Limitar a 5 gêneros
+
+    // Remover duplicatas
+    const uniqueGenres = Array.from(new Set(genres));
     
     // Se não tiver preferências, retornar livros populares
-    if (genres.length === 0) {
+    if (uniqueGenres.length === 0) {
       const books = await searchBooks("bestseller fiction", limit);
       return NextResponse.json({
         success: true,
@@ -87,11 +133,32 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Buscar IDs dos livros já vistos (likes e dislikes)
+    const seenSwipes = await prisma.swipe.findMany({
+      where: { userId: user.id },
+      select: { book: { select: { googleBooksId: true } } },
+    });
+    
+    const seenBookIds = seenSwipes
+      .map(s => s.book.googleBooksId)
+      .filter(Boolean) as string[];
+
     // Buscar livros para cada gênero favorito
     const allBooks = [];
-    const booksPerGenre = Math.ceil(limit / Math.min(genres.length, 3));
+    const booksPerGenre = Math.ceil(limit / Math.min(uniqueGenres.length, 3));
 
-    for (const genre of genres.slice(0, 3)) {
+    // Se tiver autores curtidos, buscar mais livros deles
+    if (likedAuthors.length > 0) {
+      const topAuthor = likedAuthors[0];
+      try {
+        const authorBooks = await searchBooks(`inauthor:"${topAuthor}"`, 5);
+        allBooks.push(...authorBooks);
+      } catch (error) {
+        console.error(`Error fetching books from author ${topAuthor}:`, error);
+      }
+    }
+
+    for (const genre of uniqueGenres.slice(0, 3)) {
       try {
         const query = `subject:${genre.toLowerCase()}`;
         const books = await searchBooks(query, booksPerGenre);

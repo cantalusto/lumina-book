@@ -114,6 +114,7 @@ model ReadingProfile {
 
 model Book {
   id              String   @id @default(cuid())
+  googleBooksId   String?  @unique  // ID do Google Books API
   title           String
   author          String
   cover           String

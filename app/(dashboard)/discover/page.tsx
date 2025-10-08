@@ -88,9 +88,48 @@ export default function DiscoverPage() {
     }
   };
 
-  const handleSwipe = (bookId: string, action: "like" | "dislike" | "super_like") => {
-    console.log("Swiped:", bookId, action);
-    // TODO: Implementar lógica para salvar swipe no banco de dados
+  const handleSwipe = async (bookId: string, action: "like" | "dislike" | "super_like") => {
+    // Encontrar o livro atual para pegar os dados completos
+    const book = books.find(b => b.id === bookId);
+    
+    if (!book) {
+      console.error("Livro não encontrado");
+      return;
+    }
+
+    try {
+      // Salvar swipe no banco de dados
+      const response = await fetch("/api/swipes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookId: book.id,
+          title: book.title,
+          author: book.author,
+          cover: book.cover,
+          description: book.description,
+          genres: book.genres,
+          action,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Erro ao salvar swipe");
+        return;
+      }
+
+      const data = await response.json();
+      console.log("Swipe salvo:", data);
+
+      // Se acabaram os livros, carregar mais recomendações
+      const currentIndex = books.findIndex(b => b.id === bookId);
+      if (currentIndex === books.length - 1) {
+        loadRecommendations();
+      }
+
+    } catch (error) {
+      console.error("Erro ao processar swipe:", error);
+    }
   };
 
   const handleReconfigurePreferences = () => {

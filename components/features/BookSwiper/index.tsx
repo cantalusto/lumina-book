@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, X, Star, BookOpen, Info } from "lucide-react";
+import { Heart, X, Star, BookOpen, Info, Sparkles } from "lucide-react";
 import type { Book } from "@/types";
 
 interface BookSwiperProps {
@@ -15,20 +15,34 @@ interface BookSwiperProps {
 
 export function BookSwiper({ books, onSwipe, onBookClick }: BookSwiperProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState<"left" | "right" | null>(null);
+  const [direction, setDirection] = useState<"left" | "right" | "super" | null>(null);
+  const [showOverlay, setShowOverlay] = useState<"like" | "dislike" | "super_like" | null>(null);
 
   const currentBook = books[currentIndex];
 
   const handleSwipe = (action: "like" | "dislike" | "super_like") => {
     if (!currentBook) return;
 
-    setDirection(action === "dislike" ? "left" : "right");
+    // Mostrar overlay de feedback
+    setShowOverlay(action);
+    
+    // Definir direção da animação
+    if (action === "dislike") {
+      setDirection("left");
+    } else if (action === "super_like") {
+      setDirection("super");
+    } else {
+      setDirection("right");
+    }
+
     onSwipe(currentBook.id, action);
 
+    // Avançar para o próximo livro após animação
     setTimeout(() => {
       setCurrentIndex((prev) => prev + 1);
       setDirection(null);
-    }, 300);
+      setShowOverlay(null);
+    }, 400);
   };
 
   if (!currentBook || currentIndex >= books.length) {
@@ -53,19 +67,89 @@ export function BookSwiper({ books, onSwipe, onBookClick }: BookSwiperProps) {
             initial={{ scale: 0.95, opacity: 0, rotateY: -10 }}
             animate={{ scale: 1, opacity: 1, rotateY: 0 }}
             exit={{
-              x: direction === "left" ? -400 : direction === "right" ? 400 : 0,
+              x: direction === "left" ? -500 : direction === "right" ? 500 : 0,
+              y: direction === "super" ? -600 : 0,
               opacity: 0,
-              rotateZ: direction === "left" ? -20 : direction === "right" ? 20 : 0,
-              transition: { duration: 0.4 },
+              rotateZ: direction === "left" ? -25 : direction === "right" ? 25 : 0,
+              scale: direction === "super" ? 1.2 : 0.8,
+              transition: { 
+                duration: 0.4,
+                ease: "easeOut",
+              },
             }}
             transition={{ duration: 0.3 }}
             className="absolute inset-0 w-full"
           >
-            <Card className="overflow-hidden shadow-2xl">
+            <Card className="overflow-hidden shadow-2xl relative">
               <div
                 className="h-96 bg-cover bg-center relative"
                 style={{ backgroundImage: `url(${currentBook.cover})` }}
               >
+                {/* Overlay de Feedback */}
+                <AnimatePresence>
+                  {showOverlay === "like" && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 bg-green-500/80 flex items-center justify-center z-10"
+                    >
+                      <motion.div
+                        initial={{ scale: 0, rotate: -20 }}
+                        animate={{ scale: 1.2, rotate: 0 }}
+                        transition={{ type: "spring", damping: 10 }}
+                        className="text-white"
+                      >
+                        <Heart className="h-32 w-32 fill-white" />
+                      </motion.div>
+                    </motion.div>
+                  )}
+                  
+                  {showOverlay === "dislike" && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 bg-red-500/80 flex items-center justify-center z-10"
+                    >
+                      <motion.div
+                        initial={{ scale: 0, rotate: 20 }}
+                        animate={{ scale: 1.2, rotate: 0 }}
+                        transition={{ type: "spring", damping: 10 }}
+                        className="text-white"
+                      >
+                        <X className="h-32 w-32 stroke-[3]" />
+                      </motion.div>
+                    </motion.div>
+                  )}
+                  
+                  {showOverlay === "super_like" && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 bg-gradient-to-br from-yellow-400/90 via-amber-500/90 to-orange-500/90 flex items-center justify-center z-10"
+                    >
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ 
+                          scale: [0, 1.3, 1.2],
+                          rotate: [0, 360],
+                        }}
+                        transition={{ 
+                          duration: 0.6,
+                          times: [0, 0.6, 1],
+                        }}
+                        className="text-white relative"
+                      >
+                        <Star className="h-32 w-32 fill-white" />
+                        <Sparkles className="h-16 w-16 absolute -top-4 -right-4 fill-white animate-pulse" />
+                        <Sparkles className="h-12 w-12 absolute -bottom-2 -left-2 fill-white animate-pulse delay-100" />
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-6">
                   <h3 className="text-2xl font-bold mb-1 text-white drop-shadow-lg">{currentBook.title}</h3>
