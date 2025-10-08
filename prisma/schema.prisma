@@ -1,0 +1,271 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  avatar        String?
+  password      String?
+  
+  // Reset de senha
+  resetToken         String?   @unique
+  resetTokenExpiry   DateTime?
+  
+  // Verificação de email
+  verificationToken  String?   @unique
+  
+  // Auditoria e segurança
+  lastLoginAt        DateTime?
+  lastLoginIp        String?
+  loginAttempts      Int       @default(0)
+  lockedUntil        DateTime?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts          Account[]
+  sessions          Session[]
+  readingProfile    ReadingProfile?
+  swipes            Swipe[]
+  clubs             ClubMember[]
+  achievements      UserAchievement[]
+  readingHistory    ReadingHistory[]
+  bookCollections   BookCollection[]
+  auditLogs         AuditLog[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model ReadingProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Preferências multidimensionais
+  favoriteGenres    String[]
+  readingPace       String   @default("medium") // "slow", "medium", "fast"
+  preferredLength   String   @default("medium") // "short", "medium", "long"
+  moodTags          String[]
+  vibePreferences   Json     // { atmospheric: number, plotDriven: number, etc }
+  lifeMoment        String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Book {
+  id              String   @id @default(cuid())
+  title           String
+  author          String
+  cover           String
+  description     String   @db.Text
+  isbn            String?
+  
+  // Metadados de Vibe
+  vibeTags        String[]  // ["cozy", "atmospheric", "thought-provoking"]
+  mood            String[]  // ["melancholic", "hopeful", "tense"]
+  atmosphere      String[]  // ["rainy-day", "winter-night", "summer-beach"]
+  pace            String    @default("medium") // "slow", "medium", "fast"
+  intensity       Int       @default(3) // 1-5 scale
+  
+  genres          String[]
+  pages           Int?
+  publishedYear   Int?
+  
+  // Relações
+  swipes          Swipe[]
+  clubBooks       ClubBook[]
+  readingHistory  ReadingHistory[]
+  collections     BookCollectionItem[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Swipe {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  action    String   // "like", "dislike", "super_like"
+  context   String?  // "travel", "relax", "learn"
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, bookId])
+}
+
+model Club {
+  id            String     @id @default(cuid())
+  name          String
+  description   String     @db.Text
+  vibe          String
+  coverImage    String?
+  isPublic      Boolean    @default(true)
+  
+  // Relações
+  members       ClubMember[]
+  books         ClubBook[]
+  currentBookId String?
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model ClubMember {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clubId    String
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  role      String   @default("member") // "member", "moderator", "founder"
+  progress  Int      @default(0) // Progresso de leitura em %
+  
+  joinedAt  DateTime @default(now())
+  
+  @@unique([userId, clubId])
+}
+
+model ClubBook {
+  id        String   @id @default(cuid())
+  clubId    String
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  startDate DateTime @default(now())
+  endDate   DateTime?
+  isCurrent Boolean  @default(false)
+  
+  @@unique([clubId, bookId])
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  icon        String
+  category    String   // "diversity", "consistency", "social", "exploration"
+  requirement Int      // Quantidade necessária para desbloquear
+  
+  users       UserAchievement[]
+  
+  createdAt   DateTime @default(now())
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime @default(now())
+  
+  @@unique([userId, achievementId])
+}
+
+model ReadingHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId      String
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  status      String   // "reading", "completed", "abandoned", "want_to_read"
+  progress    Int      @default(0) // Progresso em %
+  rating      Int?     // 1-5
+  review      String?  @db.Text
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, bookId])
+}
+
+model BookCollection {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  isPublic    Boolean  @default(false)
+  
+  books       BookCollectionItem[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BookCollectionItem {
+  id           String         @id @default(cuid())
+  collectionId String
+  collection   BookCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  bookId       String
+  book         Book           @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  addedAt      DateTime       @default(now())
+  
+  @@unique([collectionId, bookId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  action      String   // "login", "logout", "password_reset", "email_verified", etc
+  ip          String?
+  userAgent   String?
+  metadata    Json?    // Dados adicionais específicos da ação
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
