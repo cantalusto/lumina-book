@@ -9,7 +9,6 @@ import { Avatar } from "@/components/ui/avatar";
 import { Sparkles, Send, BookOpen, Loader2, User } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { BookDetailsModal } from "@/components/features/BookDetailsModal";
-import { searchBooks } from "@/lib/google-books";
 
 interface Message {
   role: "user" | "assistant";
@@ -139,11 +138,16 @@ Como posso te ajudar hoje? 💫`,
 
   const handleBookClick = async (bookTitle: string, author?: string) => {
     try {
-      // Buscar com intitle: para busca mais precisa pelo título
-      const query = `intitle:${bookTitle}${author ? ` inauthor:${author}` : ''}`;
-      const books = await searchBooks(query, 5);
+      // Call API endpoint that runs on server with GOOGLE_BOOKS_API_KEY
+      const params = new URLSearchParams({ title: bookTitle });
+      if (author) params.append("author", author);
       
-      if (books.length > 0) {
+      const response = await fetch(`/api/books/search-by-title?${params}`);
+      const data = await response.json();
+      
+      if (data.books && data.books.length > 0) {
+        const books = data.books;
+        
         // Encontrar o livro que melhor corresponde ao título
         const normalizeTitle = (title: string) => 
           title.toLowerCase()
@@ -155,7 +159,7 @@ Como posso te ajudar hoje? 💫`,
         const searchTitle = normalizeTitle(bookTitle);
         
         // Procurar correspondência exata primeiro
-        let bestMatch = books.find(book => 
+        let bestMatch = books.find((book: GoogleBook) => 
           normalizeTitle(book.volumeInfo.title).includes(searchTitle) ||
           searchTitle.includes(normalizeTitle(book.volumeInfo.title))
         );

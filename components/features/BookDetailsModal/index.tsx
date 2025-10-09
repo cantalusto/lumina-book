@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Star, BookOpen, Calendar, ShoppingCart } from "lucide-react";
+import { ReadingStatusButton } from "@/components/features/ReadingStatusButton";
 
 export interface BookDetails {
   id: string;
@@ -133,6 +134,12 @@ export function BookDetailsModal({ book, isOpen, onClose }: BookDetailsModalProp
                 />
               </div>
             )}
+
+            {/* Status de Leitura */}
+            <div className="pt-4 border-t">
+              <h3 className="font-semibold text-lg mb-3">Sua Leitura</h3>
+              <ReadingStatusButton bookId={book.id} />
+            </div>
 
             {/* Botões de Compra */}
             <div className="pt-4 border-t space-y-3">
